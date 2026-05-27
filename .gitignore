@@ -1,0 +1,32 @@
+# Build artifacts
+/bin/
+*.exe
+*.test
+*.out
+
+# Local secrets / config — never commit these
+*.env
+!deploy/*.env.example
+.envrc
+
+# Logs / scratch
+*.log
+*.pid
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Go workspace overrides (you'd add this intentionally per-clone)
+go.work
+go.work.sum
+
+# Coverage
+coverage.out
+coverage.html
