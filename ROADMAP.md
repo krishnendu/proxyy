@@ -26,17 +26,15 @@ how often it shows up as a real-world need.
   system user, drops the binary in `/usr/local/bin`, lays out `/etc/proxyy/`
   and `/var/lib/proxyy/certs/`, reloads systemd
 
+### v0.3 — encrypted control channel
+- TLS-wrapped control listener using the same autocert manager that issues
+  HTTPS certs (`--control-tls` server flag; `--tls` client flag, with
+  `--tls-server-name` for SNI override and `--tls-skip-verify` for dev)
+- Client cert verification against the configured domain name by default
+
 ---
 
-## Next up — v0.3
-
-### TLS on the control channel **[M, high]**
-
-The laptop ↔ VPS control channel is currently plain TCP. The auth token gates
-registration, but anyone on the path could observe tunneled bytes. Wrap the
-control listener in `crypto/tls`, reuse the autocert manager for the cert,
-and update the client to dial TLS. The client config will accept a server-name
-override so users behind weird NATs can still verify the cert.
+## Next up
 
 ### Live TCP smoke test on the deployed VPS **[S, high]**
 

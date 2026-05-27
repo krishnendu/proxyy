@@ -109,10 +109,15 @@ must appear **above** the REJECT line.
 ```bash
 export TUNNEL_SERVER=tun.proxyy.in:7000
 export TUNNEL_AUTH_TOKEN=<token from /etc/proxyy/proxyy.env>
+export TUNNEL_TLS=true   # the production server has --control-tls enabled
 
 proxyy http 3000 --subdomain myapp     # http(s)://myapp.tun.proxyy.in
 proxyy tcp 22                          # tcp://tun.proxyy.in:<assigned port>
 ```
+
+The control channel is encrypted with TLS (the same Let's Encrypt cert that
+serves your HTTPS subdomains). For local development against a plain server,
+omit `TUNNEL_TLS` or pass `--tls=false`.
 
 First HTTPS request to a new subdomain takes ~5–10 s while autocert
 provisions a Let's Encrypt cert. Subsequent requests are instant. Certs are

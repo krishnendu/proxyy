@@ -1,6 +1,7 @@
 package client
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -17,10 +18,16 @@ type Config struct {
 	LocalAddr  string
 	Subdomain  string
 	AuthToken  string
+
+	// When true, dial the server over TLS and verify its cert against
+	// TLSServerName (or the host portion of ServerAddr if empty).
+	TLS            bool
+	TLSServerName  string
+	TLSSkipVerify  bool // for self-signed dev servers
 }
 
 func Run(cfg Config) error {
-	conn, err := net.Dial("tcp", cfg.ServerAddr)
+	conn, err := dial(cfg)
 	if err != nil {
 		return fmt.Errorf("dial server: %w", err)
 	}
@@ -64,6 +71,25 @@ func Run(cfg Config) error {
 		}
 		go handleStream(stream, cfg.LocalAddr)
 	}
+}
+
+func dial(cfg Config) (net.Conn, error) {
+	if !cfg.TLS {
+		return net.Dial("tcp", cfg.ServerAddr)
+	}
+	serverName := cfg.TLSServerName
+	if serverName == "" {
+		if h, _, err := net.SplitHostPort(cfg.ServerAddr); err == nil {
+			serverName = h
+		} else {
+			serverName = cfg.ServerAddr
+		}
+	}
+	return tls.Dial("tcp", cfg.ServerAddr, &tls.Config{
+		ServerName:         serverName,
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: cfg.TLSSkipVerify,
+	})
 }
 
 func handleStream(stream net.Conn, localAddr string) {

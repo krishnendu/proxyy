@@ -12,6 +12,7 @@ EnvironmentFile=/etc/proxyy/proxyy.env
 
 ExecStart=/usr/local/bin/proxyy-server \
   --control :7000 \
+  --control-tls \
   --http :80 \
   --https :443 \
   --tcp-min 10000 \

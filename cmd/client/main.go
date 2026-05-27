@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"proxyy/internal/client"
 	"proxyy/internal/protocol"
@@ -30,6 +31,9 @@ func main() {
 	server := flag.String("server", envOr("TUNNEL_SERVER", "localhost:7000"), "tunnel server address (host:port)")
 	subdomain := flag.String("subdomain", "", "requested subdomain (http only, random if blank)")
 	auth := flag.String("auth", os.Getenv("TUNNEL_AUTH_TOKEN"), "auth token")
+	useTLS := flag.Bool("tls", envBool("TUNNEL_TLS", false), "dial the server over TLS")
+	tlsServerName := flag.String("tls-server-name", os.Getenv("TUNNEL_TLS_SERVER_NAME"), "SNI / cert verification hostname (defaults to --server's host)")
+	tlsSkipVerify := flag.Bool("tls-skip-verify", false, "skip TLS cert verification (dev only; insecure)")
 
 	flag.Usage = usage
 
@@ -53,11 +57,14 @@ func main() {
 	}
 
 	if err := client.Run(client.Config{
-		ServerAddr: *server,
-		Type:       kind,
-		LocalAddr:  local,
-		Subdomain:  *subdomain,
-		AuthToken:  *auth,
+		ServerAddr:    *server,
+		Type:          kind,
+		LocalAddr:     local,
+		Subdomain:     *subdomain,
+		AuthToken:     *auth,
+		TLS:           *useTLS,
+		TLSServerName: *tlsServerName,
+		TLSSkipVerify: *tlsSkipVerify,
 	}); err != nil {
 		log.Fatal(err)
 	}
@@ -76,6 +83,16 @@ func normalizeLocal(s string) string {
 func envOr(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func envBool(k string, def bool) bool {
+	switch strings.ToLower(os.Getenv(k)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
 	}
 	return def
 }

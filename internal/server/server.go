@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -27,6 +28,11 @@ type Config struct {
 	TCPPortMin  int
 	TCPPortMax  int
 	AuthToken   string
+
+	// When true, the control listener is wrapped in TLS using the same
+	// autocert manager that issues HTTPS certs. Requires HTTPSAddr to be set
+	// (so we have a cert source).
+	ControlTLS bool
 
 	// Used only when HTTPSAddr is set.
 	CertCacheDir string
@@ -62,6 +68,8 @@ func New(cfg Config) *Server {
 func (s *Server) Run() error {
 	httpHandler := http.HandlerFunc(s.tunnelHTTP)
 
+	var getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+
 	if s.cfg.HTTPSAddr != "" {
 		mgr := &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
@@ -73,10 +81,16 @@ func (s *Server) Run() error {
 		// and delegates everything else to our tunnel router.
 		go s.runHTTP(mgr.HTTPHandler(httpHandler))
 		go s.runHTTPS(mgr)
+		if s.cfg.ControlTLS {
+			getCert = mgr.GetCertificate
+		}
 	} else {
 		go s.runHTTP(httpHandler)
+		if s.cfg.ControlTLS {
+			return fmt.Errorf("--control-tls requires --https for cert provisioning")
+		}
 	}
-	return s.runControl()
+	return s.runControl(getCert)
 }
 
 // hostPolicy restricts which subdomains autocert will provision certificates
@@ -92,12 +106,27 @@ func (s *Server) hostPolicy(_ context.Context, host string) error {
 	return fmt.Errorf("acme: host %q not allowed", host)
 }
 
-func (s *Server) runControl() error {
-	l, err := net.Listen("tcp", s.cfg.ControlAddr)
+func (s *Server) runControl(getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
+	var (
+		l    net.Listener
+		err  error
+		mode string
+	)
+	if getCert != nil {
+		tlsCfg := &tls.Config{
+			GetCertificate: getCert,
+			MinVersion:     tls.VersionTLS12,
+		}
+		l, err = tls.Listen("tcp", s.cfg.ControlAddr, tlsCfg)
+		mode = "TLS"
+	} else {
+		l, err = net.Listen("tcp", s.cfg.ControlAddr)
+		mode = "plain"
+	}
 	if err != nil {
 		return fmt.Errorf("control listen: %w", err)
 	}
-	log.Printf("control listener on %s", s.cfg.ControlAddr)
+	log.Printf("control listener on %s (%s)", s.cfg.ControlAddr, mode)
 	for {
 		c, err := l.Accept()
 		if err != nil {

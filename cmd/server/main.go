@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 
 	"proxyy/internal/server"
 )
@@ -16,6 +17,7 @@ func main() {
 	tcpMin := flag.Int("tcp-min", 10000, "min port for tcp tunnels")
 	tcpMax := flag.Int("tcp-max", 11000, "max port for tcp tunnels")
 	auth := flag.String("auth", os.Getenv("TUNNEL_AUTH_TOKEN"), "shared auth token (empty = no auth)")
+	controlTLS := flag.Bool("control-tls", envBool("TUNNEL_CONTROL_TLS", false), "wrap the control listener in TLS (requires --https for cert provisioning)")
 	certCache := flag.String("cert-cache", envOr("TUNNEL_CERT_CACHE", "/var/lib/proxyy/certs"), "directory for Let's Encrypt cert cache (used when --https is set)")
 	acmeEmail := flag.String("acme-email", os.Getenv("TUNNEL_ACME_EMAIL"), "email registered with Let's Encrypt for cert renewal notices")
 	flag.Parse()
@@ -28,10 +30,11 @@ func main() {
 		TCPPortMin:   *tcpMin,
 		TCPPortMax:   *tcpMax,
 		AuthToken:    *auth,
+		ControlTLS:   *controlTLS,
 		CertCacheDir: *certCache,
 		ACMEEmail:    *acmeEmail,
 	})
-	log.Printf("proxyy server starting (domain=%s tcp=%d-%d https=%q)", *domain, *tcpMin, *tcpMax, *httpsAddr)
+	log.Printf("proxyy server starting (domain=%s tcp=%d-%d https=%q control-tls=%v)", *domain, *tcpMin, *tcpMax, *httpsAddr, *controlTLS)
 	if err := srv.Run(); err != nil {
 		log.Fatal(err)
 	}
@@ -40,6 +43,16 @@ func main() {
 func envOr(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func envBool(k string, def bool) bool {
+	switch strings.ToLower(os.Getenv(k)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
 	}
 	return def
 }
