@@ -10,7 +10,7 @@ on the free tier of every major cloud provider.
 ```
   laptop                       your VPS                                public internet
   ┌────────────────┐           ┌──────────────────────────────────┐    ┌──────────────┐
-  │ proxyy (client) │ ──TCP──> │ :7000  control + yamux mux       │ <─ │ browser /    │
+  │ proxyy (client) │ ──TLS──> │ :7000  control + yamux mux       │ <─ │ browser /    │
   │  forwards to    │          │ :80    HTTP routing + ACME       │    │ curl / ssh / │
   │  127.0.0.1:N    │          │ :443   HTTPS termination (LE)    │    │ webhook      │
   └────────────────┘           │ :10000-11000  raw TCP ports      │    └──────────────┘
@@ -24,13 +24,18 @@ for what's planned next.
 
 ## How it works
 
-1. The client dials the server's control port and opens a [yamux](https://github.com/hashicorp/yamux) session.
+1. The client dials the server's control port **over TLS** (verified against
+   the server's Let's Encrypt cert) and opens a
+   [yamux](https://github.com/hashicorp/yamux) session.
 2. It registers a tunnel: `http` (gets a subdomain) or `tcp` (gets a port).
 3. The server listens publicly. For each incoming connection it opens a new
    yamux stream over the tunnel; the client dials the local backend and pipes
    bytes in both directions.
 4. For HTTPS, the server terminates TLS using certs auto-issued by Let's
    Encrypt on first request to each subdomain.
+
+The same autocert manager issues certs for both the public HTTPS subdomains
+and the control channel, so there's exactly one cert source on the server.
 
 ## Quick start (local, no server needed)
 
